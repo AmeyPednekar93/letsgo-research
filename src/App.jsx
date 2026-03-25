@@ -25,25 +25,41 @@ ACT 2 — THE CAR STORY (exchanges 9–22):
 Now understand the car buying journey through the lens of who they are. Cover:
 What triggered the thought of buying or changing their car. What they are looking for — body type, size, fuel, budget — let them lead. What research they have done and what frustrated them. Who else is involved in the decision — partner, family. What cars are on their shortlist and how they got there. What is still holding them back. What they would regret most in 3 years. What an ideal car advisor would look like for someone like them.
 
-ACT 3 — WRAP UP (exchanges 23–26):
+ACT 3 — WRAP UP (exchanges 23–27):
 Ask if anything went unsaid. Then ask: "If you had to describe this whole car-buying process in one word or phrase, what would it be?" Close warmly and genuinely.
 
-After your closing line — and only then — add this exact string on a new line by itself:
+FEEDBACK (final exchange — always last):
+After your warm closing, ask one final question: "Before we finish — how did this conversation feel for you? Was it useful, and is there anything about the format or the questions that you'd change?" Wait for their response, acknowledge it warmly with one sentence, then end the conversation.
+
+After your final acknowledgement — and only then — add this exact string on a new line by itself:
 [INTERVIEW_COMPLETE]
 
 TONE: Warm. Curious. Light. Move like a good conversation, not an interview. The participant should feel understood, not interrogated. If something they say is interesting, stay with it briefly — but always keep moving forward.`;
 
 const SYNTHESIS_SYSTEM = `You are a senior user research analyst. Given a research interview transcript, produce a structured synthesis as a JSON object. Return ONLY valid JSON — no markdown fences, no preamble, no explanation.`;
 
-// ─── Storage helpers (localStorage) ──────────────────────────────────────────
+// ─── Storage helpers (Vercel KV via API) ─────────────────────────────────────
 const db = {
-  get(key) {
-    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; }
-    catch { return null; }
+  async get(key) {
+    try {
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get', key }),
+      });
+      const json = await res.json();
+      return json.data ?? null;
+    } catch { return null; }
   },
-  set(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); return true; }
-    catch (e) { console.error("Storage error", e); return false; }
+  async set(key, val) {
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', key, value: val }),
+      });
+      return true;
+    } catch (e) { console.error('KV error', e); return false; }
   },
 };
 
@@ -481,7 +497,111 @@ function SectionLabel({ children }) {
 }
 
 // ─── SCREEN: Admin ────────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = "Randompasskey1!";
+
+async function downloadTranscript(p, synth) {
+  // Fetch transcript from KV
+  const res = await fetch('/api/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get', key: `letsgo:transcript:${p.id}` }),
+  });
+  const json = await res.json();
+  const transcript = json.data || [];
+
+  const lines = [
+    `LET'S GO! — RESEARCH INTERVIEW TRANSCRIPT`,
+    `==========================================`,
+    `Participant: ${p.name}`,
+    `Date: ${p.date}`,
+    `Persona: ${p.persona || 'See synthesis'}`,
+    ``,
+    `── CONVERSATION ──`,
+    ``,
+    ...transcript
+      .filter(m => !m.content.startsWith('(The participant'))
+      .map(m => `${m.role === 'user' ? p.name.toUpperCase() : 'INTERVIEWER'}:\n${m.content}\n`),
+    ``,
+    `── SYNTHESIS ──`,
+    ``,
+    synth ? [
+      `Persona match: ${synth.persona_match}`,
+      `Description: ${synth.three_word_description}`,
+      ``,
+      `LIFE CONTEXT`,
+      `Life stage: ${synth.life_context?.life_stage || ''}`,
+      `Household: ${synth.life_context?.household || ''}`,
+      `Motivation: ${synth.life_context?.motivation || ''}`,
+      `Money relationship: ${synth.life_context?.money_relationship || ''}`,
+      `Decision style: ${synth.life_context?.decision_style || ''}`,
+      ``,
+      `CAR JOURNEY`,
+      `Trigger: ${synth.car_journey?.trigger || ''}`,
+      `Biggest confusion: ${synth.car_journey?.biggest_confusion || ''}`,
+      `What was missing: ${synth.car_journey?.what_was_missing || ''}`,
+      `Regret fear: ${synth.car_journey?.regret_fear || ''}`,
+      `Cars considering: ${synth.car_journey?.current_shortlist || ''}`,
+      `Timeline: ${synth.car_journey?.buying_timeline || ''}`,
+      ``,
+      `PARTICIPANT FEEDBACK`,
+      `Overall feeling: ${synth.participant_feedback?.overall_feeling || ''}`,
+      `What worked: ${synth.participant_feedback?.what_worked || ''}`,
+      `What to improve: ${synth.participant_feedback?.what_to_improve || ''}`,
+      ``,
+      `BEST QUOTES`,
+      ...(synth.best_quotes || []).map((q, i) => `${i+1}. "${q.quote}"\n   → ${q.why_it_matters}`),
+      ``,
+      `Biggest surprise: ${synth.biggest_surprise || ''}`,
+      `Product implication: ${synth.product_implication || ''}`,
+    ].join('\n') : 'Synthesis not available',
+  ].join('\n');
+
+  const blob = new Blob([lines], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `letsgo-${p.name.replace(/\s+/g, '-').toLowerCase()}-${p.date.replace(/\//g, '-')}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function AdminScreen({ participants, onHome, onView, viewingPid, viewingSynth }) {
+  const [password, setPassword] = useState('');
+  const [unlocked, setUnlocked] = useState(false);
+  const [pwError, setPwError] = useState(false);
+
+  if (!unlocked) {
+    return (
+      <div style={{ minHeight: '100vh', background: `linear-gradient(135deg, ${S.navy} 0%, #0F2640 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ width: '100%', maxWidth: 360, background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 36 }}>
+          <Logo size={22} />
+          <div style={{ marginTop: 20, marginBottom: 6, fontSize: 16, fontWeight: 700, color: S.white }}>Admin access</div>
+          <div style={{ fontSize: 13, color: '#64748B', marginBottom: 20 }}>Enter the admin password to view research sessions.</div>
+          <input
+            type="password"
+            value={password}
+            onChange={e => { setPassword(e.target.value); setPwError(false); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                if (password === ADMIN_PASSWORD) setUnlocked(true);
+                else setPwError(true);
+              }
+            }}
+            placeholder="Password"
+            autoFocus
+            style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${pwError ? S.red : 'rgba(255,255,255,0.15)'}`, background: 'rgba(255,255,255,0.08)', color: S.white, fontSize: 15, outline: 'none', marginBottom: 10 }}
+          />
+          {pwError && <div style={{ fontSize: 12, color: S.red, marginBottom: 10 }}>Incorrect password</div>}
+          <button
+            onClick={() => { if (password === ADMIN_PASSWORD) setUnlocked(true); else setPwError(true); }}
+            style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: S.blue, color: S.white, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+          >
+            Enter →
+          </button>
+        </div>
+      </div>
+    );
+  }
   const statusColor = s => s === "complete" ? S.green : s === "in_progress" ? S.amber : S.gray;
   const statusBg   = s => s === "complete" ? "#F0FDF4" : s === "in_progress" ? "#FFFBEB" : "#F1F5F9";
 
@@ -527,6 +647,7 @@ function AdminScreen({ participants, onHome, onView, viewingPid, viewingSynth })
                     </div>
                     <div style={{ fontSize: 11, color: S.gray }}>{p.date}</div>
                     {p.persona && <div style={{ fontSize: 11, color: S.teal, marginTop: 3 }}>{p.persona}</div>}
+                    {p.status === 'complete' && (<button onClick={e => { e.stopPropagation(); downloadTranscript(p, viewingPid?.id === p.id ? viewingSynth : null); }} style={{ marginTop: 6, fontSize: 11, color: S.blue, background: 'none', border: '1px solid #BFDBFE', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>↓ Download transcript</button>)}
                   </div>
                 ))}
               </div>
@@ -570,6 +691,7 @@ function AdminScreen({ participants, onHome, onView, viewingPid, viewingSynth })
                     )}
                     {viewingSynth.product_implication && (
                       <div style={{ background: "#F0FDF4", borderRadius: 10, padding: 14, borderLeft: `4px solid ${S.green}` }}>
+                    {viewingSynth.participant_feedback?.overall_feeling && (<div style={{ background: '#F5F3FF', borderRadius: 10, padding: 14, marginBottom: 12, borderLeft: '4px solid #6D28D9' }}><div style={{ fontSize: 10, fontWeight: 700, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Participant Feedback</div><div style={{ fontSize: 13, color: S.black, lineHeight: 1.6, marginBottom: 4 }}>{viewingSynth.participant_feedback.overall_feeling}</div>{viewingSynth.participant_feedback.what_to_improve && (<div style={{ fontSize: 12, color: S.gray }}>To improve: {viewingSynth.participant_feedback.what_to_improve}</div>)}</div>)}
                         <div style={{ fontSize: 10, fontWeight: 700, color: S.green, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 4 }}>Product Implication</div>
                         <div style={{ fontSize: 13, color: S.black, lineHeight: 1.6 }}>{viewingSynth.product_implication}</div>
                       </div>
@@ -603,16 +725,18 @@ export default function App() {
   const [viewingSynth, setViewingSynth] = useState(null);
   const [userMsgCount, setUserMsgCount] = useState(0);
 
-  useEffect(() => { setParticipants(db.get("letsgo:participants") || []); }, []);
+  useEffect(() => {
+    db.get("letsgo:participants").then(data => setParticipants(data || []));
+  }, []);
 
   async function startInterview(participantName) {
     const id = `p_${Date.now()}`;
     setPid(id); setName(participantName); setUserMsgCount(0); setMessages([]);
 
-    const list = db.get("letsgo:participants") || [];
+    const list = await db.get("letsgo:participants") || [];
     const entry = { id, name: participantName, status: "in_progress", date: new Date().toLocaleDateString("en-IN") };
     const updated = [...list, entry];
-    db.set("letsgo:participants", updated);
+    await db.set("letsgo:participants", updated);
     setParticipants(updated);
     setScreen("interview");
     setLoading(true);
@@ -624,7 +748,7 @@ export default function App() {
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
       const msgs = [...opening, { role: "assistant", content: clean }];
       setMessages(msgs);
-      db.set(`letsgo:transcript:${id}`, msgs);
+      await db.set(`letsgo:transcript:${id}`, msgs);
       if (done) await runSynthesis(id, msgs);
     } catch (e) {
       setMessages([...opening, { role: "assistant", content: "Sorry, there was an error starting the session. Please refresh and try again." }]);
@@ -645,7 +769,7 @@ export default function App() {
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
       const finalMsgs = [...newMsgs, { role: "assistant", content: clean }];
       setMessages(finalMsgs);
-      db.set(`letsgo:transcript:${pid}`, finalMsgs);
+      await db.set(`letsgo:transcript:${pid}`, finalMsgs);
       if (done) await runSynthesis(pid, finalMsgs);
     } catch (e) {
       setMessages(m => [...m, { role: "assistant", content: "I had trouble responding. Please try again." }]);
@@ -663,7 +787,7 @@ export default function App() {
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
       const finalMsgs = [...newMsgs, { role: "assistant", content: clean }];
       setMessages(finalMsgs);
-      db.set(`letsgo:transcript:${pid}`, finalMsgs);
+      await db.set(`letsgo:transcript:${pid}`, finalMsgs);
       await runSynthesis(pid, finalMsgs);
     } catch { /* ignore */ }
     setLoading(false);
@@ -676,7 +800,7 @@ export default function App() {
       .map(m => `${m.role === "user" ? "PARTICIPANT" : "INTERVIEWER"}: ${m.content}`)
       .join("\n\n");
 
-    const prompt = `Here is a user research interview transcript for "Let's Go!" — an AI-powered car buying advisor for India.\n\n${txt}\n\nProduce a synthesis JSON with this exact structure. Return only valid JSON, no markdown, no preamble:\n{\n  "participant_name": "string",\n  "persona_match": "Newly-Wed Upgrader | Repeat Expert Buyer | Mixed | Other",\n  "three_word_description": "string (3 words)",\n  "life_context": {\n    "life_stage": "string",\n    "household": "string",\n    "motivation": "string",\n    "money_relationship": "string",\n    "decision_style": "string",\n    "info_sources": "string",\n    "social_pressure": "string"\n  },\n  "car_journey": {\n    "trigger": "string",\n    "biggest_confusion": "string",\n    "what_was_missing": "string",\n    "regret_fear": "string",\n    "confidence_trigger": "string",\n    "current_shortlist": "string",\n    "buying_timeline": "string"\n  },\n  "persona_confirmed": ["string","string","string"],\n  "persona_updated": ["string","string","string"],\n  "best_quotes": [\n    {"quote": "string","why_it_matters": "string"},\n    {"quote": "string","why_it_matters": "string"},\n    {"quote": "string","why_it_matters": "string"}\n  ],\n  "biggest_surprise": "string",\n  "product_implication": "string"\n}`;
+    const prompt = `Here is a user research interview transcript for "Let's Go!" — an AI-powered car buying advisor for India.\n\n${txt}\n\nProduce a synthesis JSON with this exact structure. Return only valid JSON, no markdown, no preamble:\n{\n  "participant_name": "string",\n  "persona_match": "Newly-Wed Upgrader | Repeat Expert Buyer | Mixed | Other",\n  "three_word_description": "string (3 words)",\n  "life_context": {\n    "life_stage": "string",\n    "household": "string",\n    "motivation": "string",\n    "money_relationship": "string",\n    "decision_style": "string",\n    "info_sources": "string",\n    "social_pressure": "string"\n  },\n  "car_journey": {\n    "trigger": "string",\n    "biggest_confusion": "string",\n    "what_was_missing": "string",\n    "regret_fear": "string",\n    "confidence_trigger": "string",\n    "current_shortlist": "string",\n    "buying_timeline": "string"\n  },\n  "participant_feedback": {\n    "overall_feeling": "string (how participant described the conversation)",\n    "what_worked": "string",\n    "what_to_improve": "string"\n  },\n  "persona_confirmed": ["string","string","string"],\n  "persona_updated": ["string","string","string"],\n  "best_quotes": [\n    {"quote": "string","why_it_matters": "string"},\n    {"quote": "string","why_it_matters": "string"},\n    {"quote": "string","why_it_matters": "string"}\n  ],\n  "biggest_surprise": "string",\n  "product_implication": "string"\n}`;
 
     try {
       const raw = await claude(SYNTHESIS_SYSTEM, [{ role: "user", content: prompt }], 2000);
@@ -684,10 +808,10 @@ export default function App() {
       const parsed = JSON.parse(clean);
       setSynthesis(parsed);
 
-      const list = db.get("letsgo:participants") || [];
+      const list = await db.get("letsgo:participants") || [];
       const updated = list.map(p => p.id === id ? { ...p, status: "complete", persona: parsed.persona_match } : p);
-      db.set("letsgo:participants", updated);
-      db.set(`letsgo:synthesis:${id}`, parsed);
+      await db.set("letsgo:participants", updated);
+      await db.set(`letsgo:synthesis:${id}`, parsed);
       setParticipants(updated);
       setScreen("done");
     } catch {
@@ -696,15 +820,16 @@ export default function App() {
     }
   }
 
-  function viewParticipant(p) {
+  async function viewParticipant(p) {
     setViewingPid(p);
-    setViewingSynth(db.get(`letsgo:synthesis:${p.id}`));
+    const synth = await db.get(`letsgo:synthesis:${p.id}`);
+    setViewingSynth(synth);
   }
 
   if (screen === "welcome")      return <WelcomeScreen onStart={startInterview} onAdmin={() => setScreen("admin")} />;
   if (screen === "interview")    return <InterviewScreen name={name} messages={messages} loading={loading} input={input} setInput={setInput} onSend={sendMessage} onWrapUp={wrapUp} userMsgCount={userMsgCount} />;
   if (screen === "synthesizing") return <SynthesizingScreen name={name} />;
-  if (screen === "done")         return <DoneScreen synthesis={synthesis} name={name} onAdmin={() => { setParticipants(db.get("letsgo:participants") || []); setScreen("admin"); }} onNew={() => { setName(""); setMessages([]); setScreen("welcome"); }} />;
+  if (screen === "done")         return <DoneScreen synthesis={synthesis} name={name} onAdmin={async () => { const list = await db.get("letsgo:participants"); setParticipants(list || []); setScreen("admin"); }} onNew={() => { setName(""); setMessages([]); setScreen("welcome"); }} />;
   if (screen === "admin")        return <AdminScreen participants={participants} onHome={() => setScreen("welcome")} onView={viewParticipant} viewingPid={viewingPid} viewingSynth={viewingSynth} />;
   return null;
 }
