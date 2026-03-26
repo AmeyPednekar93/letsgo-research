@@ -19,11 +19,19 @@ ACT 1 — GET TO KNOW THEM (exchanges 1–8):
 Open with who they are and where they are in life right now. Cover these themes lightly — one question each, move on when you have the signal:
 Who they are and where they live. Who they live with and what their life looks like day to day. What they do for work and how they get around. What a good weekend looks like for them. What they are working towards in life right now — one question, light touch. How they generally make decisions — gut or research — one question only, do not ask for examples or past purchase walkthroughs.
 
-Around exchange 6–8, introduce the car naturally. Ask what they currently drive, or whether they are thinking about a new car. Let this emerge from the conversation — something like "Given everything you've told me about how you get around — do you have a car right now, or is that something you're thinking about?" This should feel like a natural next step, not a topic change.
+Around exchange 6–8, introduce the car naturally. Ask what they currently drive, and whether they are actively looking for a new car or have bought one recently. Frame it conversationally — something like "Given everything you've told me about how you get around — are you thinking about a new car, or have you recently gone through that process?" This is the branching point. Listen carefully to their answer and then follow the right track below.
 
 ACT 2 — THE CAR STORY (exchanges 9–22):
-Now understand the car buying journey through the lens of who they are. Cover:
-What triggered the thought of buying or changing their car. What they are looking for — body type, size, fuel, budget — let them lead. What research they have done and what frustrated them. Who else is involved in the decision — partner, family. What cars are on their shortlist and how they got there. What is still holding them back. What they would regret most in 3 years. What an ideal car advisor would look like for someone like them.
+There are two versions of this act depending on what the participant says. Follow the one that matches their situation.
+
+TRACK A — PLANNING TO BUY (active decision):
+Use this if they are currently researching or planning to buy within the next few months.
+Cover: What triggered the thought of buying now. What they are looking for — body type, size, fuel, budget — let them lead. What research they have done and what has frustrated them. Who else is involved in the decision — partner, family. What cars are on their shortlist and how they got there. What is still holding them back from deciding. What they would regret most in 3 years. What an ideal car advisor would look like for someone like them.
+
+TRACK B — RECENTLY BOUGHT (within the last year):
+Use this if they bought a car in the last 12 months.
+Cover: What triggered the purchase at that point in their life. How they started the research and what sources they used. What confused or frustrated them most during the process. Who else was involved and how that affected the decision. What they ultimately bought and why that car won. How they feel about the decision now that they are living with it — any regrets, any surprises. What they wish had existed to make the process easier. What an ideal car advisor would have done differently for them.
+The retrospective angle is valuable — push gently on "how do you feel about it now" and "is there anything you'd do differently". These answers are often the most honest in the whole conversation.
 
 ACT 3 — WRAP UP (exchanges 23–27):
 Ask if anything went unsaid. Then ask: "If you had to describe this whole car-buying process in one word or phrase, what would it be?" Close warmly and genuinely.
@@ -229,13 +237,16 @@ function InterviewScreen({ name, messages, loading, input, setInput, onSend, onW
                 </div>
               )}
               <div style={{
-                maxWidth: "75%", padding: "13px 17px",
+                maxWidth: m.isWelcome ? "88%" : "75%",
+                padding: m.isWelcome ? "20px 22px" : "13px 17px",
                 borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                background: m.role === "user" ? `linear-gradient(135deg, ${S.blue}, ${S.teal})` : S.white,
-                color: m.role === "user" ? S.white : S.black,
-                fontSize: 14.5, lineHeight: 1.75,
+                background: m.isWelcome ? `linear-gradient(135deg, ${S.navy}, ${S.teal})` : m.role === "user" ? `linear-gradient(135deg, ${S.blue}, ${S.teal})` : S.white,
+                color: m.isWelcome ? S.white : m.role === "user" ? S.white : S.black,
+                fontSize: m.isWelcome ? 14 : 14.5,
+                lineHeight: m.isWelcome ? 1.85 : 1.75,
                 boxShadow: m.role === "assistant" ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
-                border: m.role === "assistant" ? "1px solid #F1F5F9" : "none",
+                border: m.isWelcome ? "none" : m.role === "assistant" ? "1px solid #F1F5F9" : "none",
+                whiteSpace: "pre-line",
               }}>
                 {m.content}
               </div>
@@ -400,6 +411,7 @@ function DoneScreen({ synthesis, name, onAdmin, onNew }) {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <Badge label={synthesis.persona_match} color={S.white} bg="rgba(255,255,255,0.15)" />
             <Badge label={synthesis.three_word_description} color="#93C5FD" bg="rgba(255,255,255,0.1)" />
+            {synthesis.buyer_status && <Badge label={synthesis.buyer_status} color="#A7F3D0" bg="rgba(255,255,255,0.08)" />}
           </div>
         </div>
 
@@ -421,8 +433,10 @@ function DoneScreen({ synthesis, name, onAdmin, onNew }) {
               ["Biggest confusion", synthesis.car_journey?.biggest_confusion],
               ["What was missing", synthesis.car_journey?.what_was_missing],
               ["Regret fear", synthesis.car_journey?.regret_fear],
-              ["Cars considering", synthesis.car_journey?.current_shortlist],
-              ["Timeline", synthesis.car_journey?.buying_timeline],
+              ["Cars considering / Bought", synthesis.car_journey?.current_shortlist || synthesis.car_journey?.car_purchased],
+              ["Timeline / Purchase", synthesis.car_journey?.buying_timeline || synthesis.car_journey?.purchase_date_approx],
+              ["Feeling about decision now", synthesis.car_journey?.feeling_about_decision_now],
+              ["Wish had existed", synthesis.car_journey?.what_they_wish_existed],
             ].map(([k, v]) => v && <Field key={k} label={k} value={v} />)}
           </Card>
         </div>
@@ -741,17 +755,31 @@ export default function App() {
     setScreen("interview");
     setLoading(true);
 
+    const welcomeMsg = { role: "assistant", content: `Welcome, and thank you for being here.
+
+This is a research conversation for a product called Let's Go! — an AI-powered car buying advisor we're building for India.
+
+Before we talk about cars at all, I'd love to spend some time just understanding you — how you live, how you get around, what you're working towards. That context is actually the most important part of what we're trying to learn.
+
+There are no right or wrong answers. This isn't a quiz or a survey. Just an honest conversation, and your perspective genuinely shapes what we build.
+
+You can stop at any point.
+
+When you're ready — just tell me your name and we'll begin.`, isWelcome: true };
+    setMessages([welcomeMsg]);
+
     const opening = [{ role: "user", content: `My name is ${participantName}. I'm ready to begin.` }];
     try {
       const reply = await claude(INTERVIEW_SYSTEM, opening);
       const done = reply.includes("[INTERVIEW_COMPLETE]");
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
-      const msgs = [...opening, { role: "assistant", content: clean }];
+      const msgs = [welcomeMsg, ...opening, { role: "assistant", content: clean }];
       setMessages(msgs);
-      await db.set(`letsgo:transcript:${id}`, msgs);
-      if (done) await runSynthesis(id, msgs);
+      // Only save non-welcome messages to transcript
+      await db.set(`letsgo:transcript:${id}`, [...opening, { role: "assistant", content: clean }]);
+      if (done) await runSynthesis(id, [...opening, { role: "assistant", content: clean }]);
     } catch (e) {
-      setMessages([...opening, { role: "assistant", content: "Sorry, there was an error starting the session. Please refresh and try again." }]);
+      setMessages([welcomeMsg, ...opening, { role: "assistant", content: "Sorry, there was an error starting the session. Please refresh and try again." }]);
     }
     setLoading(false);
   }
@@ -800,7 +828,7 @@ export default function App() {
       .map(m => `${m.role === "user" ? "PARTICIPANT" : "INTERVIEWER"}: ${m.content}`)
       .join("\n\n");
 
-    const prompt = `Here is a user research interview transcript for "Let's Go!" — an AI-powered car buying advisor for India.\n\n${txt}\n\nProduce a synthesis JSON with this exact structure. Return only valid JSON, no markdown, no preamble:\n{\n  "participant_name": "string",\n  "persona_match": "Newly-Wed Upgrader | Repeat Expert Buyer | Mixed | Other",\n  "three_word_description": "string (3 words)",\n  "life_context": {\n    "life_stage": "string",\n    "household": "string",\n    "motivation": "string",\n    "money_relationship": "string",\n    "decision_style": "string",\n    "info_sources": "string",\n    "social_pressure": "string"\n  },\n  "car_journey": {\n    "trigger": "string",\n    "biggest_confusion": "string",\n    "what_was_missing": "string",\n    "regret_fear": "string",\n    "confidence_trigger": "string",\n    "current_shortlist": "string",\n    "buying_timeline": "string"\n  },\n  "participant_feedback": {\n    "overall_feeling": "string (how participant described the conversation)",\n    "what_worked": "string",\n    "what_to_improve": "string"\n  },\n  "persona_confirmed": ["string","string","string"],\n  "persona_updated": ["string","string","string"],\n  "best_quotes": [\n    {"quote": "string","why_it_matters": "string"},\n    {"quote": "string","why_it_matters": "string"},\n    {"quote": "string","why_it_matters": "string"}\n  ],\n  "biggest_surprise": "string",\n  "product_implication": "string"\n}`;
+    const prompt = `Here is a user research interview transcript for "Let's Go!" — an AI-powered car buying advisor for India.\n\n${txt}\n\nProduce a synthesis JSON with this exact structure. Return only valid JSON, no markdown, no preamble:\n{\n  "participant_name": "string",\n  "buyer_status": "Planning to buy | Recently bought (within 1 year)",\n  "persona_match": "Newly-Wed Upgrader | Repeat Expert Buyer | Mixed | Other",\n  "three_word_description": "string (3 words)",\n  "life_context": {\n    "life_stage": "string",\n    "household": "string",\n    "motivation": "string",\n    "money_relationship": "string",\n    "decision_style": "string",\n    "info_sources": "string",\n    "social_pressure": "string"\n  },\n  "car_journey": {\n    "trigger": "string",\n    "biggest_confusion": "string",\n    "what_was_missing": "string",\n    "regret_fear": "string (for planning) or post_purchase_regret (for recent buyers)",\n    "confidence_trigger": "string (for planning) or what_made_them_decide (for recent buyers)",\n    "current_shortlist": "string (for planning) or car_purchased (for recent buyers)",\n    "buying_timeline": "string (for planning) or purchase_date_approx (for recent buyers)",\n    "feeling_about_decision_now": "string (recent buyers only — how they feel living with the choice)",\n    "what_they_wish_existed": "string (recent buyers only — what would have made the process easier)"\n  },\n  "participant_feedback": {\n    "overall_feeling": "string (how participant described the conversation experience)",\n    "what_worked": "string",\n    "what_to_improve": "string"\n  },\n  "persona_confirmed": ["string","string","string"],\n  "persona_updated": ["string","string","string"],\n  "best_quotes": [\n    {"quote": "string","why_it_matters": "string"},\n    {"quote": "string","why_it_matters": "string"},\n    {"quote": "string","why_it_matters": "string"}\n  ],\n  "biggest_surprise": "string",\n  "product_implication": "string"\n}`;
 
     try {
       const raw = await claude(SYNTHESIS_SYSTEM, [{ role: "user", content: prompt }], 2000);
