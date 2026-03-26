@@ -1104,26 +1104,36 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
       const parsed = JSON.parse(clean);
       setSynthesis(parsed);
 
-      // Save everything to db only now that session is complete
+      // Email synthesis + transcript on completion
       const cleanTranscript = transcript.filter(m => !m.isWelcome);
       const participantName = parsed.participant_name || name;
       const entry = { id, name: participantName, status: "complete", persona: parsed.persona_match, date: new Date().toLocaleDateString("en-IN") };
       try {
-        const list = await db.get("letsgo:participants") || [];
-        const existing = list.find(p => p.id === id);
-        const updated = existing
-          ? list.map(p => p.id === id ? { ...p, status: "complete", persona: parsed.persona_match } : p)
-          : [...list, entry];
-        await db.set("letsgo:participants", updated);
-        await db.set(`letsgo:synthesis:${id}`, parsed);
-        await db.set(`letsgo:transcript:${id}`, cleanTranscript);
-        setParticipants(updated);
-        console.log("Session saved to database successfully:", id);
-      } catch (dbErr) {
-        console.error("Database save failed:", dbErr);
-        // Still show done screen — synthesis is in memory even if db write failed
-        setParticipants(prev => [...prev.filter(p => p.id !== id), entry]);
+        const emailRes = await fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            synthesis: parsed,
+            transcript: cleanTranscript,
+            participantName,
+          }),
+        });
+        const emailData = await emailRes.json();
+        if (!emailRes.ok) {
+          console.error("Email send failed:", emailData.error);
+        } else {
+          console.log("Email sent successfully:", emailData.emailId);
+        }
+      } catch (emailErr) {
+        console.error("Email error:", emailErr);
       }
+      // Update local state regardless of email success
+      setParticipants(prev => {
+        const existing = prev.find(p => p.id === id);
+        return existing
+          ? prev.map(p => p.id === id ? { ...p, status: "complete", persona: parsed.persona_match } : p)
+          : [...prev, entry];
+      });
       setScreen("done");
     } catch {
       setSynthesis(null);
