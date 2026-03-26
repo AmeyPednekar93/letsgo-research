@@ -747,11 +747,9 @@ export default function App() {
     const id = `p_${Date.now()}`;
     setPid(id); setName(participantName); setUserMsgCount(0); setMessages([]);
 
-    const list = await db.get("letsgo:participants") || [];
+    // Store participant in local state only — db write happens on completion
     const entry = { id, name: participantName, status: "in_progress", date: new Date().toLocaleDateString("en-IN") };
-    const updated = [...list, entry];
-    await db.set("letsgo:participants", updated);
-    setParticipants(updated);
+    setParticipants(prev => [...prev, entry]);
     setScreen("interview");
     setLoading(true);
 
@@ -775,8 +773,6 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
       const msgs = [welcomeMsg, ...opening, { role: "assistant", content: clean }];
       setMessages(msgs);
-      // Only save non-welcome messages to transcript
-      await db.set(`letsgo:transcript:${id}`, [...opening, { role: "assistant", content: clean }]);
       if (done) await runSynthesis(id, [...opening, { role: "assistant", content: clean }]);
     } catch (e) {
       setMessages([welcomeMsg, ...opening, { role: "assistant", content: "Sorry, there was an error starting the session. Please refresh and try again." }]);
@@ -797,7 +793,6 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
       const finalMsgs = [...newMsgs, { role: "assistant", content: clean }];
       setMessages(finalMsgs);
-      await db.set(`letsgo:transcript:${pid}`, finalMsgs);
       if (done) await runSynthesis(pid, finalMsgs);
     } catch (e) {
       setMessages(m => [...m, { role: "assistant", content: "I had trouble responding. Please try again." }]);
@@ -815,7 +810,6 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
       const finalMsgs = [...newMsgs, { role: "assistant", content: clean }];
       setMessages(finalMsgs);
-      await db.set(`letsgo:transcript:${pid}`, finalMsgs);
       await runSynthesis(pid, finalMsgs);
     } catch { /* ignore */ }
     setLoading(false);
@@ -836,10 +830,17 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
       const parsed = JSON.parse(clean);
       setSynthesis(parsed);
 
+      // Save everything to db only now that session is complete
+      const cleanTranscript = transcript.filter(m => !m.isWelcome);
       const list = await db.get("letsgo:participants") || [];
-      const updated = list.map(p => p.id === id ? { ...p, status: "complete", persona: parsed.persona_match } : p);
+      const entry = { id, name: parsed.participant_name, status: "complete", persona: parsed.persona_match, date: new Date().toLocaleDateString("en-IN") };
+      const existing = list.find(p => p.id === id);
+      const updated = existing
+        ? list.map(p => p.id === id ? { ...p, status: "complete", persona: parsed.persona_match } : p)
+        : [...list, entry];
       await db.set("letsgo:participants", updated);
       await db.set(`letsgo:synthesis:${id}`, parsed);
+      await db.set(`letsgo:transcript:${id}`, cleanTranscript);
       setParticipants(updated);
       setScreen("done");
     } catch {
