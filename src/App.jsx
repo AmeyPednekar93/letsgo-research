@@ -19,18 +19,30 @@ ACT 1 — GET TO KNOW THEM (exchanges 1–8):
 Open with who they are and where they are in life right now. Cover these themes lightly — one question each, move on when you have the signal:
 Who they are and where they live. Who they live with and what their life looks like day to day. What they do for work and how they get around. What a good weekend looks like for them. What they are working towards in life right now — one question, light touch. How they generally make decisions — gut or research — one question only, do not ask for examples or past purchase walkthroughs.
 
-Around exchange 6–8, introduce the car naturally. Ask what they currently drive, and whether they are actively looking for a new car or have bought one recently. Frame it conversationally — something like "Given everything you've told me about how you get around — are you thinking about a new car, or have you recently gone through that process?" This is the branching point. Listen carefully to their answer and then follow the right track below.
+Around exchange 6–8, introduce the car naturally. Ask what they currently drive, and whether they are actively looking for a new car or have bought one recently. Frame it conversationally — something like "Given everything you've told me about how you get around — are you thinking about a new car, or have you recently gone through that process?" This is the first branching point. Listen carefully to their answer and then follow the right track below.
+
+Immediately after they answer, ask one follow-up to establish whether this is their first car or a repeat purchase: "Is this your first car, or have you owned one before?" This determines a second layer of depth within each track.
 
 ACT 2 — THE CAR STORY (exchanges 9–22):
 There are two versions of this act depending on what the participant says. Follow the one that matches their situation.
 
 TRACK A — PLANNING TO BUY (active decision):
 Use this if they are currently researching or planning to buy within the next few months.
-Cover: What triggered the thought of buying now. What they are looking for — body type, size, fuel, budget — let them lead. What research they have done and what has frustrated them. Who else is involved in the decision — partner, family. What cars are on their shortlist and how they got there. What is still holding them back from deciding. What they would regret most in 3 years. What an ideal car advisor would look like for someone like them.
+
+If this is their FIRST car — go one layer deeper into the life moment: What does not having a car right now mean for their daily life? What has changed that makes now the right time? What does owning a car represent to them — freedom, responsibility, status, practicality? Understanding this emotional anchor tells you what the car really means to them beyond specs.
+
+If this is a REPEAT purchase — go one layer deeper into the previous car: What made them buy that car originally — what was going on in their life at the time? What did they love about it and what frustrated them? What has changed in their life since then that means that car no longer fits? This baseline tells you far more about what they actually need than any spec question, because every requirement they have now is implicitly a reaction to what they had before.
+
+Then continue for all buyers: What they are looking for now — body type, size, fuel, budget — let them lead. What research they have done and what has frustrated them. Who else is involved in the decision — partner, family. What cars are on their shortlist and how they got there. What is still holding them back from deciding. What they would regret most in 3 years. What an ideal car advisor would look like for someone like them.
 
 TRACK B — RECENTLY BOUGHT (within the last year):
 Use this if they bought a car in the last 12 months.
-Cover: What triggered the purchase at that point in their life. How they started the research and what sources they used. What confused or frustrated them most during the process. Who else was involved and how that affected the decision. What they ultimately bought and why that car won. How they feel about the decision now that they are living with it — any regrets, any surprises. What they wish had existed to make the process easier. What an ideal car advisor would have done differently for them.
+
+If this was their FIRST car — understand what that transition felt like: What did life look like before the car? What finally pushed them to buy? How did it feel to go through that process without any prior experience to anchor to?
+
+If this was a REPEAT purchase — go one layer deeper into what changed: What was their previous car, and what did it mean to them? What specifically broke down — the car itself, or their life around it? Understanding the gap between the old car and the new one is the most revealing thing you can learn from a repeat buyer.
+
+Then continue for all buyers: What triggered the purchase at that point in their life. How they started the research and what sources they used. What confused or frustrated them most during the process. Who else was involved and how that affected the decision. What they ultimately bought and why that car won. How they feel about the decision now that they are living with it — any regrets, any surprises. What they wish had existed to make the process easier. What an ideal car advisor would have done differently for them.
 The retrospective angle is valuable — push gently on "how do you feel about it now" and "is there anything you'd do differently". These answers are often the most honest in the whole conversation.
 
 ACT 3 — WRAP UP (exchanges 23–27):
@@ -143,7 +155,7 @@ function WelcomeScreen({ onStart, onAdmin }) {
         <div style={{ background: "rgba(255,255,255,0.05)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: 36 }}>
           <p style={{ color: "#CBD5E1", fontSize: 14, lineHeight: 1.8, marginBottom: 28, marginTop: 0 }}>
             This is a research conversation — not a test. There are no right or wrong answers.
-            We'll start by talking about <em>you</em>, before cars come up at all. It usually takes about 60 minutes.
+            We'll start by talking about <em>you</em>, before cars come up at all. It usually takes up to 30 minutes.
           </p>
 
           <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>
@@ -342,8 +354,264 @@ function SynthesizingScreen({ name }) {
   );
 }
 
+// ─── Download full report as HTML infographic ────────────────────────────────
+async function downloadFullReport(synthesis, pid, participantName) {
+  let transcript = [];
+  try {
+    const res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get', key: `letsgo:transcript:${pid}` }),
+    });
+    const json = await res.json();
+    transcript = json.data || [];
+  } catch (e) { console.error("Could not fetch transcript:", e); }
+
+  const s = synthesis || {};
+  const pName = s.participant_name || participantName;
+  const date = new Date().toLocaleDateString("en-IN");
+  const esc = (t) => (t || "—").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+  const field = (label, val, accent = "#0E7490") => val && val !== "—" ? `
+    <div class="field">
+      <div class="field-label" style="color:${accent}">${label}</div>
+      <div class="field-value">${esc(val)}</div>
+    </div>` : "";
+
+  const quoteCard = (q, i) => {
+    const colors = ["#2563EB","#0E7490","#D97706"];
+    return `<div class="quote-card" style="border-left:4px solid ${colors[i%3]}">
+      <div class="quote-text">"${esc(q.quote)}"</div>
+      <div class="quote-why">→ ${esc(q.why_it_matters)}</div>
+    </div>`;
+  };
+
+  const chatBubble = (m) => {
+    const isUser = m.role === "user";
+    return `<div class="bubble-row ${isUser ? "user-row" : "ai-row"}">
+      ${!isUser ? `<div class="avatar">LG</div>` : ""}
+      <div class="bubble ${isUser ? "bubble-user" : "bubble-ai"}">${esc(m.content)}</div>
+      ${isUser ? `<div class="avatar user-avatar">${pName[0]?.toUpperCase() || "P"}</div>` : ""}
+    </div>`;
+  };
+
+  const cleanTranscript = transcript.filter(m =>
+    !m.isWelcome && !m.content?.startsWith("(The participant")
+  );
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Let's Go! — ${esc(pName)} Research Report</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Georgia&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#F8FAFC;color:#0F172A;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+  /* ── Header ── */
+  .header{background:linear-gradient(135deg,#1A3A5C 0%,#0E7490 100%);padding:36px 48px;color:white;display:flex;align-items:center;justify-content:space-between}
+  .logo{font-family:Georgia,serif;font-size:32px;font-weight:700;color:white;letter-spacing:-0.5px}
+  .logo span{color:#60A5FA}
+  .header-meta{text-align:right}
+  .header-title{font-size:13px;color:#93C5FD;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+  .header-name{font-family:Georgia,serif;font-size:28px;font-weight:700}
+  .header-date{font-size:12px;color:#94A3B8;margin-top:4px}
+
+  /* ── Badges ── */
+  .badges{padding:16px 48px;background:#1A3A5C;display:flex;gap:10px;flex-wrap:wrap}
+  .badge{display:inline-block;padding:4px 14px;border-radius:99px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+  .badge-persona{background:rgba(255,255,255,0.15);color:white}
+  .badge-buyer{background:rgba(167,243,208,0.2);color:#6EE7B7}
+  .badge-desc{background:rgba(147,197,253,0.15);color:#93C5FD}
+
+  /* ── Layout ── */
+  .container{max-width:960px;margin:0 auto;padding:32px 24px}
+  .section{margin-bottom:32px}
+  .section-title{font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #E2E8F0}
+
+  /* ── Two-col grid ── */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:white;border-radius:12px;padding:20px;border:1px solid #E2E8F0}
+  .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:14px}
+
+  /* ── Fields ── */
+  .field{margin-bottom:12px}
+  .field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:3px}
+  .field-value{font-size:13px;line-height:1.6;color:#0F172A}
+
+  /* ── Highlight row ── */
+  .highlight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+  .highlight-card{background:white;border-radius:12px;padding:18px;border:1px solid #E2E8F0;border-top:3px solid var(--accent)}
+  .highlight-card .hl-label{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px}
+  .highlight-card .hl-value{font-size:13px;line-height:1.6;color:#0F172A}
+
+  /* ── Quotes ── */
+  .quote-card{background:white;border-radius:10px;padding:18px;border:1px solid #E2E8F0;margin-bottom:10px}
+  .quote-text{font-size:14px;font-style:italic;color:#1A3A5C;line-height:1.7;margin-bottom:6px}
+  .quote-why{font-size:12px;color:#64748B;line-height:1.5}
+
+  /* ── Two-box row ── */
+  .box-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .box-green{background:#F0FDF4;border-radius:12px;padding:18px;border:1px solid #BBF7D0}
+  .box-amber{background:#FFFBEB;border-radius:12px;padding:18px;border:1px solid #FDE68A}
+  .box-blue{background:#EFF6FF;border-radius:12px;padding:18px;border:1px solid #BFDBFE}
+  .box-purple{background:#F5F3FF;border-radius:12px;padding:18px;border:1px solid #DDD6FE}
+  .box-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px}
+  .box-item{font-size:13px;line-height:1.6;margin-bottom:6px;color:#0F172A}
+
+  /* ── Transcript ── */
+  .transcript-section{margin-top:40px;padding-top:24px;border-top:2px solid #E2E8F0}
+  .bubble-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:16px}
+  .user-row{flex-direction:row-reverse}
+  .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0E7490);display:flex;align-items:center;justify-content:center;font-size:10px;color:white;font-weight:700;flex-shrink:0;margin-top:2px}
+  .user-avatar{background:#E2E8F0;color:#64748B}
+  .bubble{max-width:72%;padding:12px 16px;border-radius:16px;font-size:13.5px;line-height:1.75;white-space:pre-wrap}
+  .bubble-ai{background:white;border:1px solid #F1F5F9;border-radius:4px 16px 16px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+  .bubble-user{background:linear-gradient(135deg,#2563EB,#0E7490);color:white;border-radius:16px 4px 16px 16px}
+
+  /* ── Footer ── */
+  .footer{text-align:center;padding:24px;font-size:11px;color:#94A3B8;margin-top:32px;border-top:1px solid #E2E8F0}
+
+  /* ── Print ── */
+  @media print{
+    body{background:white}
+    .transcript-section{page-break-before:always}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">Let's <span>Go!</span></div>
+  <div class="header-meta">
+    <div class="header-title">Research Session Report</div>
+    <div class="header-name">${esc(pName)}</div>
+    <div class="header-date">${date}</div>
+  </div>
+</div>
+
+<div class="badges">
+  ${s.persona_match ? `<span class="badge badge-persona">${esc(s.persona_match)}</span>` : ""}
+  ${s.buyer_status ? `<span class="badge badge-buyer">${esc(s.buyer_status)}</span>` : ""}
+  ${s.three_word_description ? `<span class="badge badge-desc">${esc(s.three_word_description)}</span>` : ""}
+</div>
+
+<div class="container">
+
+  <!-- ── Key signals ── -->
+  <div class="section">
+    <div class="section-title">Key Signals</div>
+    <div class="highlight-grid">
+      <div class="highlight-card" style="--accent:#DC2626">
+        <div class="hl-label">Biggest Confusion</div>
+        <div class="hl-value">${esc(s.car_journey?.biggest_confusion)}</div>
+      </div>
+      <div class="highlight-card" style="--accent:#D97706">
+        <div class="hl-label">Regret Fear</div>
+        <div class="hl-value">${esc(s.car_journey?.regret_fear)}</div>
+      </div>
+      <div class="highlight-card" style="--accent:#0E7490">
+        <div class="hl-label">What Was Missing</div>
+        <div class="hl-value">${esc(s.car_journey?.what_was_missing)}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Life context + Car journey ── -->
+  <div class="section">
+    <div class="section-title">Profile</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title" style="color:#2563EB">Life Context</div>
+        ${field("Life Stage", s.life_context?.life_stage, "#2563EB")}
+        ${field("Household", s.life_context?.household, "#2563EB")}
+        ${field("Motivation", s.life_context?.motivation, "#2563EB")}
+        ${field("Money Relationship", s.life_context?.money_relationship, "#2563EB")}
+        ${field("Decision Style", s.life_context?.decision_style, "#2563EB")}
+        ${field("Info Sources", s.life_context?.info_sources, "#2563EB")}
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:#0E7490">Car Journey</div>
+        ${field("Trigger", s.car_journey?.trigger, "#0E7490")}
+        ${field("Cars Considering / Bought", s.car_journey?.current_shortlist || s.car_journey?.car_purchased, "#0E7490")}
+        ${field("Timeline / Purchase Date", s.car_journey?.buying_timeline || s.car_journey?.purchase_date_approx, "#0E7490")}
+        ${field("Confidence Trigger", s.car_journey?.confidence_trigger || s.car_journey?.what_made_them_decide, "#0E7490")}
+        ${s.car_journey?.feeling_about_decision_now ? field("Feeling About Decision Now", s.car_journey.feeling_about_decision_now, "#0E7490") : ""}
+        ${s.car_journey?.what_they_wish_existed ? field("Wish Had Existed", s.car_journey.what_they_wish_existed, "#0E7490") : ""}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Quotes ── -->
+  ${(s.best_quotes || []).length > 0 ? `
+  <div class="section">
+    <div class="section-title">Best Quotes</div>
+    ${(s.best_quotes || []).map(quoteCard).join("")}
+  </div>` : ""}
+
+  <!-- ── Confirmed / Updated ── -->
+  <div class="box-row">
+    <div class="box-green">
+      <div class="box-title" style="color:#15803D">Persona Confirmed</div>
+      ${(s.persona_confirmed || []).map(c => `<div class="box-item">✓ ${esc(c)}</div>`).join("")}
+    </div>
+    <div class="box-amber">
+      <div class="box-title" style="color:#D97706">Updated / New Insight</div>
+      ${(s.persona_updated || []).map(u => `<div class="box-item">→ ${esc(u)}</div>`).join("")}
+    </div>
+  </div>
+
+  <!-- ── Surprise + Implication ── -->
+  <div class="box-row">
+    ${s.biggest_surprise ? `<div class="box-blue">
+      <div class="box-title" style="color:#2563EB">Biggest Surprise</div>
+      <div class="box-item">${esc(s.biggest_surprise)}</div>
+    </div>` : "<div></div>"}
+    ${s.product_implication ? `<div class="box-blue" style="background:#F0FDF4;border-color:#BBF7D0">
+      <div class="box-title" style="color:#15803D">Product Implication</div>
+      <div class="box-item">${esc(s.product_implication)}</div>
+    </div>` : "<div></div>"}
+  </div>
+
+  <!-- ── Participant feedback ── -->
+  ${s.participant_feedback?.overall_feeling ? `
+  <div class="section">
+    <div class="section-title">Participant Feedback</div>
+    <div class="box-purple">
+      <div class="box-title" style="color:#6D28D9">How the conversation felt</div>
+      <div class="box-item">${esc(s.participant_feedback.overall_feeling)}</div>
+      ${s.participant_feedback.what_worked ? `<div class="box-item" style="margin-top:8px;color:#64748B;font-size:12px">What worked: ${esc(s.participant_feedback.what_worked)}</div>` : ""}
+      ${s.participant_feedback.what_to_improve ? `<div class="box-item" style="color:#64748B;font-size:12px">To improve: ${esc(s.participant_feedback.what_to_improve)}</div>` : ""}
+    </div>
+  </div>` : ""}
+
+  <!-- ── Transcript ── -->
+  ${cleanTranscript.length > 0 ? `
+  <div class="transcript-section">
+    <div class="section-title">Full Conversation</div>
+    ${cleanTranscript.map(chatBubble).join("")}
+  </div>` : ""}
+
+</div>
+
+<div class="footer">Let's Go! Research  ·  ${esc(pName)}  ·  ${date}  ·  Confidential</div>
+
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `letsgo-${pName.replace(/\s+/g, "-").toLowerCase()}-report.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── SCREEN: Done ─────────────────────────────────────────────────────────────
-function DoneScreen({ synthesis, name, onAdmin, onNew }) {
+function DoneScreen({ synthesis, name, pid, onAdmin, onNew }) {
   const [copied, setCopied] = useState(false);
 
   const plainText = synthesis ? [
@@ -396,6 +664,9 @@ function DoneScreen({ synthesis, name, onAdmin, onNew }) {
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={copy} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: copied ? S.green : S.white, color: copied ? S.white : S.gray, fontSize: 13, cursor: "pointer" }}>
             {copied ? "✓ Copied" : "Copy synthesis"}
+          </button>
+          <button onClick={() => downloadFullReport(synthesis, pid, name)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #E2E8F0", background: S.white, color: S.teal, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+            ↓ Download full report
           </button>
           <button onClick={onAdmin} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: S.blue, color: S.white, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
             View all sessions →
@@ -661,7 +932,7 @@ function AdminScreen({ participants, onHome, onView, viewingPid, viewingSynth })
                     </div>
                     <div style={{ fontSize: 11, color: S.gray }}>{p.date}</div>
                     {p.persona && <div style={{ fontSize: 11, color: S.teal, marginTop: 3 }}>{p.persona}</div>}
-                    {p.status === 'complete' && (<button onClick={e => { e.stopPropagation(); downloadTranscript(p, viewingPid?.id === p.id ? viewingSynth : null); }} style={{ marginTop: 6, fontSize: 11, color: S.blue, background: 'none', border: '1px solid #BFDBFE', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>↓ Download transcript</button>)}
+                    {p.status === 'complete' && (<button onClick={e => { e.stopPropagation(); downloadFullReport(viewingSynth || null, p.id, p.name); }} style={{ marginTop: 6, fontSize: 11, color: S.blue, background: 'none', border: '1px solid #BFDBFE', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>↓ Download report (.html)</button>)}
                   </div>
                 ))}
               </div>
@@ -835,16 +1106,24 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
 
       // Save everything to db only now that session is complete
       const cleanTranscript = transcript.filter(m => !m.isWelcome);
-      const list = await db.get("letsgo:participants") || [];
-      const entry = { id, name: parsed.participant_name, status: "complete", persona: parsed.persona_match, date: new Date().toLocaleDateString("en-IN") };
-      const existing = list.find(p => p.id === id);
-      const updated = existing
-        ? list.map(p => p.id === id ? { ...p, status: "complete", persona: parsed.persona_match } : p)
-        : [...list, entry];
-      await db.set("letsgo:participants", updated);
-      await db.set(`letsgo:synthesis:${id}`, parsed);
-      await db.set(`letsgo:transcript:${id}`, cleanTranscript);
-      setParticipants(updated);
+      const participantName = parsed.participant_name || name;
+      const entry = { id, name: participantName, status: "complete", persona: parsed.persona_match, date: new Date().toLocaleDateString("en-IN") };
+      try {
+        const list = await db.get("letsgo:participants") || [];
+        const existing = list.find(p => p.id === id);
+        const updated = existing
+          ? list.map(p => p.id === id ? { ...p, status: "complete", persona: parsed.persona_match } : p)
+          : [...list, entry];
+        await db.set("letsgo:participants", updated);
+        await db.set(`letsgo:synthesis:${id}`, parsed);
+        await db.set(`letsgo:transcript:${id}`, cleanTranscript);
+        setParticipants(updated);
+        console.log("Session saved to database successfully:", id);
+      } catch (dbErr) {
+        console.error("Database save failed:", dbErr);
+        // Still show done screen — synthesis is in memory even if db write failed
+        setParticipants(prev => [...prev.filter(p => p.id !== id), entry]);
+      }
       setScreen("done");
     } catch {
       setSynthesis(null);
@@ -861,7 +1140,7 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
   if (screen === "welcome")      return <WelcomeScreen onStart={startInterview} onAdmin={() => setScreen("admin")} />;
   if (screen === "interview")    return <InterviewScreen name={name} messages={messages} loading={loading} input={input} setInput={setInput} onSend={sendMessage} onWrapUp={wrapUp} userMsgCount={userMsgCount} />;
   if (screen === "synthesizing") return <SynthesizingScreen name={name} />;
-  if (screen === "done")         return <DoneScreen synthesis={synthesis} name={name} onAdmin={async () => { const list = await db.get("letsgo:participants"); setParticipants(list || []); setScreen("admin"); }} onNew={() => { setName(""); setMessages([]); setScreen("welcome"); }} />;
+  if (screen === "done")         return <DoneScreen synthesis={synthesis} name={name} pid={pid} onAdmin={async () => { const list = await db.get("letsgo:participants"); setParticipants(list || []); setScreen("admin"); }} onNew={() => { setName(""); setMessages([]); setScreen("welcome"); }} />;
   if (screen === "admin")        return <AdminScreen participants={participants} onHome={() => setScreen("welcome")} onView={viewParticipant} viewingPid={viewingPid} viewingSynth={viewingSynth} />;
   return null;
 }
