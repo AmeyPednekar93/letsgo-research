@@ -788,7 +788,9 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
     setUserMsgCount(c => c + 1);
 
     try {
-      const reply = await claude(INTERVIEW_SYSTEM, newMsgs);
+      // Filter out the welcome message — Anthropic API requires conversation to start with user role
+      const apiMsgs = newMsgs.filter(m => !m.isWelcome).map(({ role, content }) => ({ role, content }));
+      const reply = await claude(INTERVIEW_SYSTEM, apiMsgs);
       const done = reply.includes("[INTERVIEW_COMPLETE]");
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
       const finalMsgs = [...newMsgs, { role: "assistant", content: clean }];
@@ -806,7 +808,8 @@ When you're ready — just tell me your name and we'll begin.`, isWelcome: true 
     const newMsgs = [...messages, wrapMsg];
     setLoading(true);
     try {
-      const reply = await claude(INTERVIEW_SYSTEM, newMsgs);
+      const apiMsgs = newMsgs.filter(m => !m.isWelcome).map(({ role, content }) => ({ role, content }));
+      const reply = await claude(INTERVIEW_SYSTEM, apiMsgs);
       const clean = reply.replace("[INTERVIEW_COMPLETE]", "").trim();
       const finalMsgs = [...newMsgs, { role: "assistant", content: clean }];
       setMessages(finalMsgs);
