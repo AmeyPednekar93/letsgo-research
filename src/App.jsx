@@ -207,7 +207,7 @@ function WelcomeScreen({ onStart, onAdmin }) {
 function InterviewScreen({ name, messages, loading, input, setInput, onSend, onWrapUp, userMsgCount }) {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
-  const showWrapUp = userMsgCount >= 22 && !loading;
+  const showWrapUp = userMsgCount >= 5 && !loading;
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
   useEffect(() => { if (!loading) inputRef.current?.focus(); }, [loading]);
