@@ -64,6 +64,8 @@ Exchange 1 — WHY THEY BOUGHT IT ORIGINALLY: Ask specifically "What made you go
 Exchange 2 — WHAT THEY LOVE AND WHAT FRUSTRATES THEM: "What's been great about it, and what's starting to feel like it no longer fits?" Listen for the gap between then and now.
 Exchange 3 — WHAT HAS CHANGED IN LIFE: What is different now that means this car no longer works? Marriage, kids, job, commute, lifestyle?
 
+Exchange 4 — HOW THEY MADE THAT PURCHASE DECISION: Keep this light — one question. "When you bought it, how did you go about deciding — how long did it take and what did you do to get there?" You are looking for: how long the process took, what research they did (test drives, forums, friends, dealers), and how they finally made the call. This tells you what their research style looks like in practice, not just in theory.
+
 Then for all (remaining exchanges): What they are looking for now. Research done and frustrations. Who else is involved. Shortlist and how they got there. What is still holding them back. What they would regret most in 3 years. What an ideal car advisor would look like.
 
 TRACK B — RECENTLY BOUGHT:
